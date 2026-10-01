@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import queue
+import sys
 import threading
 import time
 import tkinter as tk
@@ -246,7 +247,16 @@ class TranscriberApp:
         self.root.destroy()
 
 
+def _ensure_std_streams() -> None:
+    # Windowed exe builds have no console, so stdout/stderr are None
+    # tqdm (used by Whisper's model download) would crash writing to None
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+
+
 def main() -> None:
+    _ensure_std_streams()
     root = tk.Tk()
     TranscriberApp(root)
     root.mainloop()
