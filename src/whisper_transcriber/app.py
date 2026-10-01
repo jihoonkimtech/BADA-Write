@@ -1,4 +1,4 @@
-"""Tkinter front-end for the Whisper transcription engine."""
+"""Tkinter front-end for the Whisper transcription engines."""
 
 from __future__ import annotations
 
@@ -20,12 +20,14 @@ from .engine import (
     MODEL_NAMES,
     OUTPUT_FORMATS,
     Transcriber,
+    available_backends,
     format_segments,
     write_result,
 )
 
 POLL_INTERVAL_MS = 100
 STATUS_MAX_CHARS = 80
+NO_ENGINE_LABEL = "(설치된 엔진 없음)"
 
 
 class TranscriberApp:
@@ -34,7 +36,7 @@ class TranscriberApp:
     def __init__(self, root: tk.Tk, transcriber: Transcriber | None = None) -> None:
         self.root = root
         self.root.title(f"Whisper 받아쓰기 v{__version__}")
-        self.root.geometry("720x620")
+        self.root.geometry("760x660")
         self.root.minsize(560, 480)
 
         self.transcriber = transcriber or Transcriber()
@@ -63,36 +65,51 @@ class TranscriberApp:
         self.file_label.pack(side="left", fill="x", expand=True)
         ttk.Button(file_frame, text="파일 찾기", command=self.select_file).pack(side="right")
 
-        # Options row: model, language, timestamp toggle
+        # Options: engine, model, language, toggles, vocabulary hint
         opt = ttk.LabelFrame(self.root, text="설정", padding=8)
         opt.pack(fill="x", **pad)
 
-        ttk.Label(opt, text="모델").grid(row=0, column=0, sticky="w")
+        # Only engines that are actually installed are offered
+        engines = available_backends()
+        ttk.Label(opt, text="엔진").grid(row=0, column=0, sticky="w")
+        self.engine_var = tk.StringVar(value=engines[0] if engines else NO_ENGINE_LABEL)
+        ttk.Combobox(
+            opt, textvariable=self.engine_var, values=engines or [NO_ENGINE_LABEL], state="readonly", width=14
+        ).grid(row=0, column=1, sticky="w", padx=(4, 16))
+
+        ttk.Label(opt, text="모델").grid(row=0, column=2, sticky="w")
         self.model_var = tk.StringVar(value=DEFAULT_MODEL)
         ttk.Combobox(opt, textvariable=self.model_var, values=MODEL_NAMES, state="readonly", width=10).grid(
-            row=0, column=1, padx=(4, 16)
+            row=0, column=3, sticky="w", padx=(4, 16)
         )
 
-        ttk.Label(opt, text="언어").grid(row=0, column=2, sticky="w")
+        ttk.Label(opt, text="언어").grid(row=0, column=4, sticky="w")
         self.lang_var = tk.StringVar(value=DEFAULT_LANGUAGE)
         ttk.Combobox(opt, textvariable=self.lang_var, values=list(LANGUAGES), state="readonly", width=10).grid(
-            row=0, column=3, padx=(4, 16)
+            row=0, column=5, sticky="w", padx=(4, 0)
         )
 
+        toggles = ttk.Frame(opt)
+        toggles.grid(row=1, column=0, columnspan=7, sticky="w", pady=(8, 0))
+        # Reduces repeated sentences and invented text at the cost of slightly less context
+        self.suppress_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(toggles, text="반복·환각 억제", variable=self.suppress_var).pack(side="left", padx=(0, 16))
         # Toggling only re-renders the existing result, no re-transcription needed
         self.timestamp_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(opt, text="타임스탬프 표시", variable=self.timestamp_var, command=self._render_result).grid(
-            row=0, column=4, sticky="w"
-        )
+        ttk.Checkbutton(
+            toggles, text="타임스탬프 표시", variable=self.timestamp_var, command=self._render_result
+        ).pack(side="left")
 
-        # Vocabulary hint passed to Whisper as initial_prompt to fix domain-specific terms
-        ttk.Label(opt, text="용어 힌트").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        # Vocabulary hint passed to the engine to fix domain-specific terms
+        ttk.Label(opt, text="용어 힌트").grid(row=2, column=0, sticky="w", pady=(8, 0))
         self.hint_var = tk.StringVar()
-        ttk.Entry(opt, textvariable=self.hint_var).grid(row=1, column=1, columnspan=4, sticky="ew", padx=(4, 0), pady=(8, 0))
+        ttk.Entry(opt, textvariable=self.hint_var).grid(
+            row=2, column=1, columnspan=6, sticky="ew", padx=(4, 0), pady=(8, 0)
+        )
         ttk.Label(
             opt, text="영상에 나오는 전문 용어를 쉼표로 구분해 입력 (예: 축전기, 전하, 기전력, 시상수)", foreground="gray"
-        ).grid(row=2, column=1, columnspan=4, sticky="w", padx=(4, 0))
-        opt.columnconfigure(4, weight=1)
+        ).grid(row=3, column=1, columnspan=6, sticky="w", padx=(4, 0))
+        opt.columnconfigure(6, weight=1)
 
         # Run button and progress bar
         self.run_button = ttk.Button(self.root, text="받아쓰기 시작", command=self.start_transcription)
@@ -144,8 +161,10 @@ class TranscriberApp:
         params = {
             "path": self.selected_file_path,
             "model_name": self.model_var.get(),
+            "backend": None if self.engine_var.get() == NO_ENGINE_LABEL else self.engine_var.get(),
             "language": LANGUAGES[self.lang_var.get()],
             "initial_prompt": self.hint_var.get(),
+            "suppress_hallucination": self.suppress_var.get(),
         }
 
         self._set_busy(True)

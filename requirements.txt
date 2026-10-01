@@ -1,1 +1,3 @@
-openai-whisper>=20240930
+faster-whisper>=1.1.0
+# Optional second engine; needs PyTorch and ffmpeg
+# openai-whisper>=20250625
