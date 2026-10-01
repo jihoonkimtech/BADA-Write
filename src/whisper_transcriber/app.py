@@ -85,6 +85,15 @@ class TranscriberApp:
             row=0, column=4, sticky="w"
         )
 
+        # Vocabulary hint passed to Whisper as initial_prompt to fix domain-specific terms
+        ttk.Label(opt, text="용어 힌트").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self.hint_var = tk.StringVar()
+        ttk.Entry(opt, textvariable=self.hint_var).grid(row=1, column=1, columnspan=4, sticky="ew", padx=(4, 0), pady=(8, 0))
+        ttk.Label(
+            opt, text="영상에 나오는 전문 용어를 쉼표로 구분해 입력 (예: 축전기, 전하, 기전력, 시상수)", foreground="gray"
+        ).grid(row=2, column=1, columnspan=4, sticky="w", padx=(4, 0))
+        opt.columnconfigure(4, weight=1)
+
         # Run button and progress bar
         self.run_button = ttk.Button(self.root, text="받아쓰기 시작", command=self.start_transcription)
         self.run_button.pack(fill="x", **pad)
@@ -136,6 +145,7 @@ class TranscriberApp:
             "path": self.selected_file_path,
             "model_name": self.model_var.get(),
             "language": LANGUAGES[self.lang_var.get()],
+            "initial_prompt": self.hint_var.get(),
         }
 
         self._set_busy(True)

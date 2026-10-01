@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import inspect
 import os
 import shutil
 import sys
@@ -152,6 +153,27 @@ def _patched_progress(callback: Optional[ProgressCallback]) -> Iterator[None]:
         module.tqdm = original
 
 
+def _accepts_kwarg(func: Callable, name: str) -> bool:
+    # True when func has a parameter with this name or accepts **kwargs
+    try:
+        params = inspect.signature(func).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(p.name == name or p.kind is p.VAR_KEYWORD for p in params)
+
+
+def build_decode_options(transcribe_func: Callable, initial_prompt: Optional[str]) -> dict:
+    # Turn the user's vocabulary hint into Whisper prompt options
+    hint = (initial_prompt or "").strip()
+    if not hint:
+        return {}
+    options = {"initial_prompt": hint}
+    # By default the prompt only affects the first 30 s window; carry it to every window when supported
+    if _accepts_kwarg(transcribe_func, "carry_initial_prompt"):
+        options["carry_initial_prompt"] = True
+    return options
+
+
 class Transcriber:
     """Loads Whisper models once and reuses them across runs."""
 
@@ -179,6 +201,7 @@ class Transcriber:
         device: Optional[str] = None,
         on_status: Optional[Callable[[str], None]] = None,
         on_progress: Optional[ProgressCallback] = None,
+        initial_prompt: Optional[str] = None,
     ) -> dict:
         # Validate inputs before spending time on model loading
         if not os.path.isfile(path):
@@ -196,6 +219,8 @@ class Transcriber:
             status(f"{prefix}모델 로딩 중... ({model_name}, {device.upper()})")
             model = self.load_model(model_name, device)
 
+            options = build_decode_options(model.transcribe, initial_prompt)
+
             status("음성 인식 중...")
             with _patched_progress(on_progress):
                 # fp16 is only supported on GPU; passing False avoids the CPU warning
@@ -204,6 +229,7 @@ class Transcriber:
                     language=language,
                     fp16=(device == "cuda"),
                     verbose=False if on_progress else None,
+                    **options,
                 )
 
 

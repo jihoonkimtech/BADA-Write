@@ -127,3 +127,33 @@ def test_write_result_rejects_unknown_extension(tmp_path):
 )
 def test_cuda_arch_supported(capability, arch_list, expected):
     assert engine.cuda_arch_supported(capability, arch_list) is expected
+
+
+def test_decode_options_empty_hint():
+    assert engine.build_decode_options(FakeModel().transcribe, "   ") == {}
+
+
+def test_decode_options_with_real_whisper_signature():
+    import whisper
+
+    opts = engine.build_decode_options(whisper.transcribe, " 축전기, 전하 ")
+    assert opts["initial_prompt"] == "축전기, 전하"
+    # Installed whisper supports carrying the prompt to every window
+    assert opts["carry_initial_prompt"] is True
+
+
+def test_decode_options_with_old_whisper_signature():
+    def old_transcribe(model, audio, *, initial_prompt=None):
+        return {}
+
+    assert engine.build_decode_options(old_transcribe, "축전기") == {"initial_prompt": "축전기"}
+
+
+def test_transcribe_forwards_hint(monkeypatch, media_file):
+    monkeypatch.setattr(engine.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+    fake = FakeModel()
+    transcriber = engine.Transcriber()
+    monkeypatch.setattr(transcriber, "load_model", lambda name, device: fake)
+    transcriber.transcribe(media_file, device="cpu", initial_prompt="축전기, 기전력")
+    assert fake.kwargs["initial_prompt"] == "축전기, 기전력"
+    assert fake.kwargs["carry_initial_prompt"] is True
