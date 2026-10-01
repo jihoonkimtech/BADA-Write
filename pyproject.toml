@@ -8,11 +8,13 @@ version = "0.2.0"
 description = "Desktop GUI for transcribing video and audio files with OpenAI Whisper"
 readme = "README.md"
 requires-python = ">=3.9"
+license = { text = "MIT" }
 authors = [{ name = "Jihoon Kim" }]
 dependencies = ["openai-whisper>=20240930"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+build = ["pyinstaller>=6.6"]
 
 [project.gui-scripts]
 whisper-transcriber = "whisper_transcriber.app:main"

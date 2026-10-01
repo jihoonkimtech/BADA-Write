@@ -175,6 +175,7 @@ whisper-transcriber/
 │   └── test_engine.py   # 모델 다운로드 없이 도는 엔진 테스트
 ├── docs/
 │   └── screenshot.png
+├── LICENSE              # MIT
 ├── pyproject.toml       # 패키지 메타데이터, 실행 명령 등록
 ├── requirements.txt
 ├── requirements-dev.txt
