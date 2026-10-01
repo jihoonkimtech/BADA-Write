@@ -6,6 +6,7 @@ import contextlib
 import importlib
 import os
 import shutil
+import sys
 import threading
 from typing import Callable, Iterator, Optional
 
@@ -35,8 +36,19 @@ class FFmpegNotFoundError(RuntimeError):
     """Raised when the ffmpeg binary is not available on PATH."""
 
 
+def _add_bundled_ffmpeg_to_path() -> None:
+    # PyInstaller builds unpack bundled files under sys._MEIPASS; expose ffmpeg there via PATH
+    base = getattr(sys, "_MEIPASS", None)
+    if not base:
+        return
+    bundled_dir = os.path.join(base, "ffmpeg")
+    if os.path.isdir(bundled_dir) and bundled_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = bundled_dir + os.pathsep + os.environ.get("PATH", "")
+
+
 def ensure_ffmpeg() -> None:
     # Whisper shells out to ffmpeg for decoding, so fail early with a clear message
+    _add_bundled_ffmpeg_to_path()
     if shutil.which("ffmpeg") is None:
         raise FFmpegNotFoundError(
             "ffmpeg를 찾을 수 없습니다. ffmpeg를 설치하고 PATH에 추가한 뒤 다시 실행해 주세요."
