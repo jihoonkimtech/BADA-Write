@@ -25,6 +25,7 @@ from .engine import (
 )
 
 POLL_INTERVAL_MS = 100
+STATUS_MAX_CHARS = 80
 
 
 class TranscriberApp:
@@ -182,8 +183,11 @@ class TranscriberApp:
             )
             self.events.put(("done", result))
         except Exception as exc:
-            # Send both a one-line summary and the full traceback for debugging
-            summary = f"{type(exc).__name__}: {exc}"
+            # Keep the status line to one short line; the full traceback goes to the result box
+            first_line = (str(exc).strip().splitlines() or [""])[0]
+            if len(first_line) > STATUS_MAX_CHARS:
+                first_line = first_line[:STATUS_MAX_CHARS] + "..."
+            summary = f"{type(exc).__name__}: {first_line}"
             self.events.put(("error", (summary, traceback.format_exc())))
 
     # ---------- main-thread event handling ----------
@@ -223,12 +227,6 @@ class TranscriberApp:
             self.result_text.delete("1.0", tk.END)
             self.result_text.insert(tk.END, trace)
             self.copy_button.config(state="normal")
-
-            # Also print to the console when launched from a terminal
-            print(trace, file=sys.stderr)
-
-            # Parent the dialog to the main window so it does not open behind it
-            messagebox.showerror("오류 발생", f"작업 도중 오류가 발생했습니다:\n{summary}", parent=self.root)
 
     def _update_elapsed(self) -> None:
         elapsed = time.monotonic() - self.started_at
