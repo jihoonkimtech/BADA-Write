@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import traceback
 from tkinter import filedialog, messagebox, ttk
 
 from . import __version__
@@ -181,7 +182,9 @@ class TranscriberApp:
             )
             self.events.put(("done", result))
         except Exception as exc:
-            self.events.put(("error", f"{type(exc).__name__}: {exc}"))
+            # Send both a one-line summary and the full traceback for debugging
+            summary = f"{type(exc).__name__}: {exc}"
+            self.events.put(("error", (summary, traceback.format_exc())))
 
     # ---------- main-thread event handling ----------
 
@@ -212,9 +215,20 @@ class TranscriberApp:
             self.status_label.config(text=f"변환 완료 ({elapsed:.1f}초, 감지 언어: {lang})", foreground="green")
             self._set_busy(False)
         elif kind == "error":
-            self.status_label.config(text="오류 발생", foreground="red")
+            summary, trace = payload  # type: ignore[misc]
             self._set_busy(False)
-            messagebox.showerror("오류 발생", f"작업 도중 오류가 발생했습니다:\n{payload}")
+            self.status_label.config(text=f"오류 발생: {summary}", foreground="red")
+
+            # Show the full traceback in the result box so it can be read and copied
+            self.result_text.delete("1.0", tk.END)
+            self.result_text.insert(tk.END, trace)
+            self.copy_button.config(state="normal")
+
+            # Also print to the console when launched from a terminal
+            print(trace, file=sys.stderr)
+
+            # Parent the dialog to the main window so it does not open behind it
+            messagebox.showerror("오류 발생", f"작업 도중 오류가 발생했습니다:\n{summary}", parent=self.root)
 
     def _update_elapsed(self) -> None:
         elapsed = time.monotonic() - self.started_at
