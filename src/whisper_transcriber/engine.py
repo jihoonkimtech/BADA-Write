@@ -55,11 +55,36 @@ def ensure_ffmpeg() -> None:
         )
 
 
-def detect_device() -> str:
+def cuda_arch_supported(capability: tuple, arch_list: list) -> bool:
+    # A CUDA build ships kernels only for listed GPU generations, e.g. sm_86 or compute_90
+    major, minor = capability
+    cap = major * 10 + minor
+    for arch in arch_list:
+        kind, _, num = arch.partition("_")
+        if not num.isdigit():
+            continue
+        n = int(num)
+        # Binary kernels run on the same major generation with an equal or newer minor
+        if kind == "sm" and n // 10 == major and n <= cap:
+            return True
+        # PTX code can be JIT-compiled for any newer GPU
+        if kind == "compute" and n <= cap:
+            return True
+    return False
+
+
+def detect_device() -> tuple:
     # Lazy import keeps app startup fast since torch is heavy
     import torch
 
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    if not torch.cuda.is_available():
+        return "cpu", None
+    capability = torch.cuda.get_device_capability(0)
+    if not cuda_arch_supported(capability, torch.cuda.get_arch_list()):
+        # Avoid "no kernel image is available" by running on CPU instead
+        name = torch.cuda.get_device_name(0)
+        return "cpu", f"{name}는 설치된 PyTorch가 지원하지 않아 CPU로 실행합니다"
+    return "cuda", None
 
 
 def format_timestamp(seconds: float) -> str:
@@ -161,11 +186,14 @@ class Transcriber:
         ensure_ffmpeg()
 
         status = on_status or (lambda _msg: None)
-        device = device or detect_device()
+        note = None
+        if device is None:
+            device, note = detect_device()
 
         # Serialize runs so the model and the tqdm patch are never shared concurrently
         with self._lock:
-            status(f"모델 로딩 중... ({model_name}, {device.upper()})")
+            prefix = f"{note} / " if note else ""
+            status(f"{prefix}모델 로딩 중... ({model_name}, {device.upper()})")
             model = self.load_model(model_name, device)
 
             status("음성 인식 중...")

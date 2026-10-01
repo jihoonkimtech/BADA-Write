@@ -112,3 +112,18 @@ def test_write_result_all_formats(tmp_path, fmt):
 def test_write_result_rejects_unknown_extension(tmp_path):
     with pytest.raises(ValueError):
         engine.write_result(SAMPLE_RESULT, str(tmp_path / "out.docx"))
+
+
+@pytest.mark.parametrize(
+    "capability, arch_list, expected",
+    [
+        ((8, 6), ["sm_50", "sm_80", "sm_86", "sm_90"], True),
+        ((8, 9), ["sm_80", "sm_86", "sm_90"], True),
+        ((12, 0), ["sm_50", "sm_80", "sm_86", "sm_90"], False),
+        ((12, 0), ["sm_90", "sm_120"], True),
+        ((12, 0), ["sm_80", "compute_90"], True),
+        ((3, 7), ["sm_50", "sm_60", "sm_90"], False),
+    ],
+)
+def test_cuda_arch_supported(capability, arch_list, expected):
+    assert engine.cuda_arch_supported(capability, arch_list) is expected
