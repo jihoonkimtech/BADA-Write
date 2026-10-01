@@ -165,7 +165,12 @@ class TranscriberApp:
         if not out_path:
             return
         try:
-            write_result(self.last_result, out_path)
+            if out_path.lower().endswith(".txt"):
+                # Save exactly what is shown, including manual edits, instead of one line per segment
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(self.result_text.get("1.0", "end-1c"))
+            else:
+                write_result(self.last_result, out_path)
         except Exception as exc:
             messagebox.showerror("저장 실패", str(exc))
             return
