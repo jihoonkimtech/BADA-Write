@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whisper-transcriber"
+version = "0.2.0"
+description = "Desktop GUI for transcribing video and audio files with OpenAI Whisper"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Jihoon Kim" }]
+dependencies = ["openai-whisper>=20240930"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.gui-scripts]
+whisper-transcriber = "whisper_transcriber.app:main"
+
+[project.urls]
+Homepage = "https://github.com/jihoonkimtech/whisper-transcriber"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
